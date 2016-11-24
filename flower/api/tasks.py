@@ -595,7 +595,7 @@ Get a task info
             raise HTTPError(404, "Unknown task '%s'" % taskid)
         response = {}
         for name in task._fields:
-            if name not in ['uuid', 'worker']:
+            if name not in ['uuid', 'worker', 'children', 'parent', 'root']:
                 response[name] = getattr(task, name, None)
         response['task-id'] = task.uuid
         if task.worker is not None:
