@@ -5,6 +5,11 @@ import logging
 from tornado import web
 from tornado import gen
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 from .control import ControlHandler
 
 
@@ -157,12 +162,41 @@ List workers
         refresh = self.get_argument('refresh', default=False, type=bool)
         status = self.get_argument('status', default=False, type=bool)
         workername = self.get_argument('workername', default=None)
+        summary = self.get_argument('summary', default=False, type=bool)
 
         if status:
             info = {}
             for name, worker in self.application.events.state.workers.items():
                 info[name] = worker.alive
             self.write(info)
+            return
+
+        if summary:
+            workers = OrderedDict()
+            state = self.application.events.state
+            for name, worker in sorted(state.workers.items()):
+                counter = state.counter[name]
+                started = counter.get('task-started', 0)
+                processed = counter.get('task-received', 0)
+                failed = counter.get('task-failed', 0)
+                succeeded = counter.get('task-succeeded', 0)
+                retried = counter.get('task-retried', 0)
+                active = started - succeeded - failed - retried
+                if active < 0:
+                    active = 'N/A'
+
+                workers[name] = dict(
+                    name=name,
+                    started=started,
+                    status=worker.alive,
+                    active=active,
+                    processed=processed,
+                    failed=failed,
+                    succeeded=succeeded,
+                    retried=retried,
+                    loadavg=getattr(worker, 'loadavg', None))
+
+                self.write(workers)
             return
 
         if self.worker_cache and not refresh and\
